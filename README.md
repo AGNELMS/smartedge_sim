@@ -65,3 +65,4 @@ pip install -r requirements.txt
 
 - Dashboard View
   
+![Screenshot (338)](https://github.com/user-attachments/assets/be9f0cbc-87cc-462b-9144-2b6c69da857f)
