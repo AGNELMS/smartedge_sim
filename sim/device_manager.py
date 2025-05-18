@@ -1,5 +1,4 @@
 from .virtual_sensor import VirtualSensor
-import time
 
 class DeviceManager:
     """Manages multiple virtual sensors"""

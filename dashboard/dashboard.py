@@ -1,14 +1,13 @@
 import streamlit as st
 import requests
-import time
 import pandas as pd
 import matplotlib.pyplot as plt
+from datetime import datetime
+import time
 
-st.title("📦 SmartEdge Inventory Monitor")
-
-# Session state to track restocks
-if 'restock_history' not in st.session_state:
-    st.session_state.restock_history = []
+# Page configuration
+st.set_page_config(layout="wide")
+st.title("📊 SmartEdge Inventory Monitor")
 
 def fetch_data():
     try:
@@ -19,64 +18,68 @@ def fetch_data():
     except requests.exceptions.RequestException as e:
         return {"status": "error", "message": str(e)}
 
-def restock_shelves():
-    try:
-        response = requests.post(
-            "http://localhost:5000/restock",
-            json={"amount": 100}  # Refill to 100 units
+def create_historical_chart(df):
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # Color palette for sensors
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
+    
+    # Plot each sensor's data
+    for i, device_id in enumerate(df['device_id'].unique()):
+        device_data = df[df['device_id'] == device_id]
+        ax.plot(
+            device_data['timestamp'], 
+            device_data['inventory_level'], 
+            label=device_id,
+            color=colors[i % len(colors)],
+            linewidth=2
         )
-        if response.status_code == 200:
-            st.session_state.restock_history.append(time.time())
-            st.success("✅ Shelves restocked to 100 units!")
-        else:
-            st.error(f"Restock failed: {response.json().get('message')}")
-    except Exception as e:
-        st.error(f"Connection error: {str(e)}")
+    
+    # Chart formatting
+    ax.set_xlabel("Time", fontsize=12)
+    ax.set_ylabel("Inventory Level", fontsize=12)
+    ax.set_title("Inventory History", fontsize=14)
+    ax.legend(loc='upper right')
+    ax.grid(True, alpha=0.3)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    
+    return fig
 
-def display_dashboard():
+# Main dashboard layout
+col1, col2 = st.columns([1, 3])
+
+with col1:
+    st.header("Current Levels")
     data = fetch_data()
     
-    if data.get("status") == "success":
-        # Current Levels Section
-        st.subheader("Current Inventory Levels")
-        cols = st.columns(3)
+    if data.get("status") == "success" and data.get("logs"):
+        # Get latest reading for each sensor
+        latest_readings = {}
+        for log in reversed(data["logs"]):
+            if log["device_id"].startswith("Sensor") and log["device_id"] not in latest_readings:
+                latest_readings[log["device_id"]] = log["inventory_level"]
         
-        if data.get("logs"):
-            latest = {log['device_id']: log['inventory_level'] for log in data["logs"][-3:]}
-            for i, (shelf, level) in enumerate(latest.items()):
-                cols[i].metric(
-                    label=shelf,
-                    value=f"{level:.1f} units",
-                    delta=f"{level-100:.1f}%" if level < 100 else None
-                )
-        else:
-            st.info("No inventory data yet")
-
-        # Restock Button
-        st.button("🔄 Restock All Shelves", on_click=restock_shelves)
-        
-        # Historical Chart
-        if data.get("logs"):
-            st.subheader("Historical Inventory Data")
-            df = pd.DataFrame(data["logs"])
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
-            
-            fig, ax = plt.subplots()
-            for shelf in df['device_id'].unique():
-                shelf_data = df[df['device_id'] == shelf]
-                ax.plot(shelf_data['timestamp'], shelf_data['inventory_level'], label=shelf)
-            
-            # Add vertical lines for restocks
-            for restock_time in st.session_state.restock_history:
-                ax.axvline(pd.to_datetime(restock_time, unit='s'), color='r', linestyle='--', alpha=0.3)
-            
-            ax.set_xlabel("Time")
-            ax.set_ylabel("Inventory Level")
-            ax.legend()
-            ax.grid(True)
-            st.pyplot(fig)
-        
+        # Display metrics
+        for device_id, level in latest_readings.items():
+            st.metric(
+                label=device_id,
+                value=f"{level:.1f} units",
+                delta=f"{level-100:.1f}%" if level < 100 else None
+            )
     else:
-        st.error(f"❌ Connection failed: {data.get('message')}")
+        st.warning("Waiting for sensor data...")
 
-display_dashboard()
+with col2:
+    st.header("Historical Trends")
+    if data.get("status") == "success" and data.get("logs"):
+        df = pd.DataFrame(data["logs"])
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
+        df = df[df['device_id'].str.startswith('Sensor')]  # Filter out system messages
+        st.pyplot(create_historical_chart(df))
+    else:
+        st.info("No historical data available yet")
+
+# Auto-refresh every 5 seconds
+time.sleep(5)
+st.rerun()
