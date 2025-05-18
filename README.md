@@ -11,7 +11,6 @@ A complete IoT simulation platform with virtual edge devices, AI anomaly detecti
 - 🏭 **Virtual IoT Devices** - Simulate multiple inventory sensors
 - 🧠 **Edge AI** - Detect abnormal inventory drops
 - 📊 **Live Dashboard** - Streamlit visualization with historical charts
-- 🔄 **Restock Control** - Manual inventory reset button
 - ☁️ **Cloud-Ready** - Flask backend with REST API
 
 ## 🏗 System Architecture
