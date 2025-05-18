@@ -1,0 +1,4 @@
+flask==2.0.1
+streamlit==1.14.0
+requests==2.26.0
+paho-mqtt==1.6.1
